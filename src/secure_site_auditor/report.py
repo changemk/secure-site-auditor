@@ -8,7 +8,14 @@ from .auditor import AuditResult
 
 
 def render_text(result: AuditResult) -> str:
-    lines = ["Secure Site Auditor", f"Target: {result.target}", f"Final URL: {result.final_url}", f"Score: {result.score}/100", ""]
+    lines = [
+        "Secure Site Auditor",
+        f"Target: {result.target}",
+        f"Final URL: {result.final_url}",
+        f"Redirects: {' -> '.join(result.redirect_chain)}",
+        f"Score: {result.score}/100",
+        "",
+    ]
     for finding in result.findings:
         lines.append(f"[{finding.status.upper()}] {finding.check}: {finding.message}")
         if finding.remediation and finding.status != "pass":
@@ -32,7 +39,8 @@ body{{margin:0;background:#10110f;color:#f1f0e9;font:16px system-ui,sans-serif}}
 .finding div{{display:flex;align-items:center;gap:14px}}.finding span{{font:700 11px monospace;letter-spacing:.1em;color:#c8ff32}}
 .finding.warn span{{color:#ffcc66}}.finding.fail span{{color:#ff6b6b}}h1,h2{{margin:0}}h2{{font-size:20px}}p,small{{color:#b8b9b0;line-height:1.6}}small{{display:block}}
 </style></head><body><main><p class="meta">PASSIVE WEBSITE SECURITY REVIEW</p><h1>{html.escape(result.target)}</h1>
-<div class="score">{result.score}<small>/100</small></div><p class="meta">Scanned {html.escape(result.scanned_at)}</p>{''.join(rows)}</main></body></html>"""
+<div class="score">{result.score}<small>/100</small></div><p class="meta">Final URL: {html.escape(result.final_url)}<br>
+Redirects: {html.escape(' -> '.join(result.redirect_chain))}<br>Scanned {html.escape(result.scanned_at)}</p>{''.join(rows)}</main></body></html>"""
 
 
 def save_report(result: AuditResult, output: str, output_format: str) -> Path:

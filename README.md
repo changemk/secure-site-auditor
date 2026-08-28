@@ -5,8 +5,9 @@ A dependency-free, passive website security posture checker built by Change Muri
 ## What it checks
 
 - HTTPS availability and redirect behavior
-- TLS certificate validity and expiry
-- HSTS, CSP, clickjacking, MIME sniffing, and referrer protections
+- Full redirect-chain recording and explicit HTTP-to-HTTPS enforcement
+- TLS certificate validity, expiry, issuer, negotiated protocol, and cipher
+- HSTS, CSP, clickjacking, MIME sniffing, referrer, and permissions policy strength
 - Information exposed through the `Server` and `X-Powered-By` headers
 - Security flags on response cookies
 - A simple, explainable security score
@@ -40,8 +41,11 @@ On Windows PowerShell, activate the environment with:
 site-audit https://example.com
 site-audit example.com --format json
 site-audit example.com --format html --output reports/example.html
+site-audit example.com --fail-below 75
 site-audit --help
 ```
+
+`--fail-below` is designed for CI pipelines. The command exits with status `1` when the score is below the chosen threshold, `2` for invalid input or an audit error, and `0` otherwise.
 
 ## Example
 

@@ -13,11 +13,20 @@ def parser() -> argparse.ArgumentParser:
     command.add_argument("--format", choices=("text", "json", "html"), default="text")
     command.add_argument("--output", help="Write the report to a file")
     command.add_argument("--timeout", type=float, default=10.0)
+    command.add_argument(
+        "--fail-below",
+        type=int,
+        metavar="SCORE",
+        help="Exit with status 1 when the security score is below SCORE (0-100)",
+    )
     return command
 
 
 def main() -> int:
     args = parser().parse_args()
+    if args.fail_below is not None and not 0 <= args.fail_below <= 100:
+        print("Error: --fail-below must be between 0 and 100.", file=sys.stderr)
+        return 2
     try:
         result = audit(args.target, timeout=args.timeout)
     except (ValueError, RuntimeError) as exc:
@@ -34,7 +43,7 @@ def main() -> int:
         print(json.dumps(result.to_dict(), indent=2))
     else:
         print(render_text(result))
-    return 0
+    return 1 if args.fail_below is not None and result.score < args.fail_below else 0
 
 
 if __name__ == "__main__":
