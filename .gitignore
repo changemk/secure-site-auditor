@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+.uv-python/
+.uv-cache/
+dist/
+build/
+*.egg-info/
+reports/*.html
+reports/*.json
