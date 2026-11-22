@@ -148,6 +148,7 @@ def _csp_weaknesses(value: str) -> list[str]:
     elif all(any(_broad_source(s) for s in sources) for sources in defaults):
         warnings.append("default-src has a broad source list")
 
+    # Resolve script fallbacks within each policy before testing their combined restrictions.
     scripts = [p.get("script-src", p.get("default-src")) for p in policies]
     script_lists = [sources for sources in scripts if sources is not None]
     if script_lists and all("'unsafe-eval'" in sources for sources in script_lists):
@@ -204,6 +205,7 @@ def _header_findings(headers: dict[str, str], is_https: bool) -> list[Finding]:
         elif key == "referrer-policy" and value:
             known = STRONG_REFERRER_POLICIES | {"origin", "origin-when-cross-origin", "unsafe-url", "no-referrer-when-downgrade"}
             tokens = [part.strip().lower() for part in value.split(",")]
+            # A later recognized referrer policy overrides earlier fallback values.
             effective = next((p for p in reversed(tokens) if p in known), "")
             valid = effective in STRONG_REFERRER_POLICIES
             message = f"Effective policy: {effective}." if effective else "No recognized referrer policy."
@@ -327,6 +329,7 @@ def _open_url(url: str, timeout: float):
     try:
         response = build_opener(recorder).open(request, timeout=timeout)
     except HTTPError as exc:
+        # Error pages carry headers and a body too. Keep the status so the report identifies the page.
         response = exc
     except URLError as exc:
         raise RuntimeError(f"Could not reach the target: {exc.reason}") from exc
@@ -369,6 +372,7 @@ def _html_findings(response, url: str) -> list[Finding]:
     if response.headers.get("Content-Encoding", "identity").lower() != "identity":
         return [Finding("HTML inspection", "info", "Skipped encoded response body.")]
     try:
+        # The extra byte distinguishes an exactly-at-limit page from a truncated sample.
         body = response.read(HTML_LIMIT + 1)
         charset = response.headers.get_content_charset() or "utf-8-sig"
         if body.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
@@ -403,6 +407,7 @@ def _html_findings(response, url: str) -> list[Finding]:
             status = "fail" if label == "Form transport" and http_password else "warn"
             findings.append(Finding(label, status, f"Observed in markup: {examples}.", fix, 0, 10))
         elif complete and applicable:
+            # A partial sample can reveal an HTTP URL, but a clean sample cannot establish a pass.
             findings.append(Finding(label, "pass", "No HTTP reference found in the inspected markup.", "", 10, 10))
     if not findings:
         findings.append(Finding("HTML inspection", "info", "No applicable resource or form transport checks in this markup."))
@@ -419,6 +424,7 @@ def audit(target: str, timeout: float = 10.0) -> AuditResult:
         final_url = response.geturl()
         status = response.getcode()
         headers = {key.lower(): value for key, value in response.headers.items()}
+        # Repeated policy fields form ordered lists. Each Set-Cookie field describes a separate cookie.
         for name in ("content-security-policy", "referrer-policy"):
             if name in headers:
                 headers[name] = ", ".join(response.headers.get_all(name))
@@ -446,6 +452,7 @@ def audit(target: str, timeout: float = 10.0) -> AuditResult:
     ]
     if is_https and parsed.hostname:
         findings.append(_tls_finding(parsed.hostname, parsed.port or 443, timeout=min(timeout, 5.0)))
+    # Check the host the user entered even if the final page moved to another host.
     original = urlparse(target)
     if original.scheme == "http":
         findings.append(_redirect_result(redirect_chain))
@@ -465,6 +472,7 @@ def audit(target: str, timeout: float = 10.0) -> AuditResult:
     findings.extend(page_findings)
 
     earned = sum(item.points for item in findings)
+    # Coverage notes have zero weight, so a skipped check cannot raise or lower the score.
     possible = sum(item.max_points for item in findings)
     score = round((earned / possible) * 100) if possible else 0
     return AuditResult(report_url(target), report_url(final_url), datetime.now(timezone.utc).isoformat(),

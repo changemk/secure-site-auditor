@@ -22,6 +22,7 @@ class PageMarkup(HTMLParser):
         self.inert: list[str] = []
 
     def handle_starttag(self, tag, attrs):
+        # An iframe's src is a resource. Its fallback markup is outside the parent page's checks.
         if tag in {"template", "noscript", "textarea", "title", "iframe"}:
             self.inert.append(tag)
             if len(self.inert) > 1 or tag != "iframe":
@@ -53,6 +54,7 @@ class PageMarkup(HTMLParser):
         base = urljoin(document, self.base or "")
         evidence = []
         for label, value in references:
+            # An empty form action submits to the document URL even when a base href is present.
             destination = urljoin(base, value.strip()) if value.strip() else document
             if urlsplit(destination).scheme == "http":
                 evidence.append(f"{label} {report_url(destination)}")

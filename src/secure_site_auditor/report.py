@@ -10,6 +10,7 @@ from .auditor import AuditResult
 
 
 def _terminal_text(value: str) -> str:
+    # A site's response can contain control characters that a terminal would interpret.
     return "".join(char if char.isprintable() else " " for char in value)
 
 

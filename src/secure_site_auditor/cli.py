@@ -44,6 +44,7 @@ def main() -> int:
         print(json.dumps(result.to_dict(), indent=2))
     else:
         print(render_text(result, width=shutil.get_terminal_size((88, 24)).columns))
+    # Emit the report before applying the threshold so CI retains evidence for a failed check.
     return 1 if args.fail_below is not None and result.score < args.fail_below else 0
 
 
