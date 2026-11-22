@@ -63,8 +63,8 @@ class FindingTests(unittest.TestCase):
     def test_http_redirect_to_https_passes(self):
         class Response:
             @staticmethod
-            def geturl():
-                return "https://example.com/"
+            def close():
+                pass
 
         with patch(
             "secure_site_auditor.auditor._open_url",

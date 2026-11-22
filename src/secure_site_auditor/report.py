@@ -2,29 +2,54 @@ from __future__ import annotations
 
 import html
 import json
+import textwrap
+from collections import Counter
 from pathlib import Path
 
 from .auditor import AuditResult
 
 
-def render_text(result: AuditResult) -> str:
+def _terminal_text(value: str) -> str:
+    return "".join(char if char.isprintable() else " " for char in value)
+
+
+def render_text(result: AuditResult, width: int = 88) -> str:
+    width = max(32, min(width, 120))
+    counts = Counter(f.status for f in result.findings)
+    earned = sum(f.points for f in result.findings)
+    possible = sum(f.max_points for f in result.findings)
     lines = [
         "Secure Site Auditor",
-        f"Target: {result.target}",
-        f"Final URL: {result.final_url}",
-        f"Redirects: {' -> '.join(result.redirect_chain)}",
-        f"Score: {result.score}/100",
-        "",
+        "=" * 19,
+        f"Target       {_terminal_text(result.target)}",
     ]
-    for finding in result.findings:
-        lines.append(f"[{finding.status.upper()}] {finding.check}: {finding.message}")
-        if finding.remediation and finding.status != "pass":
-            lines.append(f"       Fix: {finding.remediation}")
+    if len(result.redirect_chain) > 1:
+        lines.extend(textwrap.wrap("Redirects    " + " -> ".join(map(_terminal_text, result.redirect_chain)),
+                                   width, subsequent_indent="             "))
+    if result.final_url != result.target:
+        lines.append(f"Final URL    {_terminal_text(result.final_url)}")
+    if result.http_status is not None:
+        lines.append(f"Response     HTTP {result.http_status}")
+    lines.extend([
+        f"Score        {result.score}/100  ({earned}/{possible} applicable points)",
+        f"Checks       {counts['fail']} failed, {counts['warn']} warnings, {counts['pass']} passed, {counts['info']} info",
+    ])
+    for title, statuses in (("Needs attention", ("fail", "warn")), ("Passed", ("pass",)), ("Coverage notes", ("info",))):
+        group = [f for status in statuses for f in result.findings if f.status == status]
+        if group:
+            lines.extend(["", title, "-" * len(title)])
+        for finding in group:
+            lines.append(f"[{finding.status.upper()}] {_terminal_text(finding.check)}")
+            lines.extend(textwrap.wrap(_terminal_text(finding.message), width, initial_indent="  ", subsequent_indent="  "))
+            if finding.remediation and finding.status in {"warn", "fail"}:
+                lines.extend(textwrap.wrap("Fix: " + _terminal_text(finding.remediation), width,
+                                           initial_indent="  ", subsequent_indent="       "))
     return "\n".join(lines)
 
 
 def render_html(result: AuditResult) -> str:
     rows = []
+    status_line = f"HTTP {result.http_status}<br>" if result.http_status is not None else ""
     for finding in result.findings:
         remediation = html.escape(finding.remediation) if finding.status != "pass" else ""
         rows.append(
@@ -39,7 +64,7 @@ body{{margin:0;background:#10110f;color:#f1f0e9;font:16px system-ui,sans-serif}}
 .finding div{{display:flex;align-items:center;gap:14px}}.finding span{{font:700 11px monospace;letter-spacing:.1em;color:#c8ff32}}
 .finding.warn span{{color:#ffcc66}}.finding.fail span{{color:#ff6b6b}}h1,h2{{margin:0}}h2{{font-size:20px}}p,small{{color:#b8b9b0;line-height:1.6}}small{{display:block}}
 </style></head><body><main><p class="meta">PASSIVE WEBSITE SECURITY REVIEW</p><h1>{html.escape(result.target)}</h1>
-<div class="score">{result.score}<small>/100</small></div><p class="meta">Final URL: {html.escape(result.final_url)}<br>
+<div class="score">{result.score}<small>/100</small></div><p class="meta">{status_line}Final URL: {html.escape(result.final_url)}<br>
 Redirects: {html.escape(' -> '.join(result.redirect_chain))}<br>Scanned {html.escape(result.scanned_at)}</p>{''.join(rows)}</main></body></html>"""
 
 

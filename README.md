@@ -5,11 +5,13 @@ A dependency-free, passive website security posture checker built by Change Muri
 ## What it checks
 
 - HTTPS availability and redirect behavior
-- Full redirect-chain recording and explicit HTTP-to-HTTPS enforcement
+- Redirect-chain recording, HTTPS-to-HTTP downgrades, and HTTP-to-HTTPS enforcement
 - TLS certificate validity, expiry, issuer, negotiated protocol, and cipher
 - HSTS, CSP, clickjacking, MIME sniffing, referrer, and permissions policy strength
 - Information exposed through the `Server` and `X-Powered-By` headers
-- Security flags on response cookies
+- Cookie attributes, SameSite values, partitioned cookies, and the `__Host-` and `__Secure-` prefix rules
+- HTTP scripts, stylesheets, and frames referenced by HTTPS pages
+- Password fields on HTTP pages and forms or submit controls pointing to HTTP
 - A simple, explainable security score
 - HTML and JSON report generation
 
@@ -47,17 +49,19 @@ site-audit --help
 
 `--fail-below` is designed for CI pipelines. The command exits with status `1` when the score is below the chosen threshold, `2` for invalid input or an audit error, and `0` otherwise.
 
-## Example
+## Reading the CLI report
+
+The summary shows the final HTTP status, the weighted score, and how many checks passed, warned, or failed. The score is the percentage of applicable points earned for this response. For a 404 or 500, the findings describe the error page. An HTTP status warning alone carries no points.
+
+Failures and warnings appear first, with evidence and a suggested fix. For example, inspecting a login page served over HTTP can produce this finding:
 
 ```text
-Secure Site Auditor
-Target: https://example.com
-Score: 78/100
-
-[PASS] HTTPS is enabled
-[WARN] Content-Security-Policy is missing
-[PASS] Cookies use the Secure flag
+[FAIL] Form transport
+  Observed in markup: password field on an HTTP page; form http://example.com/login.
+  Fix: Serve the form and its submission endpoint over HTTPS.
 ```
+
+The scanner inspects up to 512 KiB of the final HTML response. It reads static markup without running JavaScript, submitting forms, or fetching linked resources. Coverage notes identify skipped or truncated inspections. An incomplete body can supply evidence for a warning or failure but earns no passing HTML points. Report URLs omit credentials, query strings, and fragments.
 
 ## Roadmap
 

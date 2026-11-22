@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 
 from .auditor import audit
@@ -42,7 +43,7 @@ def main() -> int:
 
         print(json.dumps(result.to_dict(), indent=2))
     else:
-        print(render_text(result))
+        print(render_text(result, width=shutil.get_terminal_size((88, 24)).columns))
     return 1 if args.fail_below is not None and result.score < args.fail_below else 0
 
 
